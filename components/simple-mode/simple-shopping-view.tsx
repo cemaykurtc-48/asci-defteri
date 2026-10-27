@@ -9,8 +9,10 @@ import {
   Plus,
   Calendar,
   Download,
-  AlertCircle,
   MessageCircle,
+  Maximize2,
+  X,
+  Check,
 } from 'lucide-react';
 import {
   SimpleShoppingItem,
@@ -37,11 +39,16 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
   const [selectedWeddingId, setSelectedWeddingId] = useState('');
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
 
+  // Full-screen drawing canvas modal state
+  const [isFullscreenDrawingOpen, setIsFullscreenDrawingOpen] = useState(false);
+
   // Active item
   const activeItem = shoppingItems.find((item) => item.id === activeItemId) || shoppingItems[0] || null;
 
-  // Canvas drawing state
+  // Canvas drawing state (Inline & Fullscreen)
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fullCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokes, setStrokes] = useState<DrawingStroke[]>([]);
   const currentStrokeRef = useRef<{ x: number; y: number }[]>([]);
@@ -71,57 +78,57 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
     }
   }, [activeItem?.id, activeItem?.photoDataUrl]);
 
-  // Redraw canvas whenever base image or strokes change
-  const redrawCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  // Redraw canvas helper
+  const drawOnTargetCanvas = useCallback(
+    (canvas: HTMLCanvasElement | null) => {
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    // Clear
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw background paper photo
-    if (baseImageRef.current && isImageLoaded) {
-      ctx.drawImage(baseImageRef.current, 0, 0, canvas.width, canvas.height);
-    } else {
-      // Empty background placeholder if no image
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = 'bold 16px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Fotoğraf bulunamadı', canvas.width / 2, canvas.height / 2);
-    }
-
-    // Draw all strokes
-    strokes.forEach((stroke) => {
-      if (stroke.points.length < 2) return;
-      ctx.beginPath();
-      ctx.strokeStyle = stroke.color || '#ef4444';
-      ctx.lineWidth = stroke.lineWidth || 6;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-      for (let i = 1; i < stroke.points.length; i++) {
-        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      if (baseImageRef.current && isImageLoaded) {
+        ctx.drawImage(baseImageRef.current, 0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Fotoğraf yükleniyor...', canvas.width / 2, canvas.height / 2);
       }
-      ctx.stroke();
-    });
-  }, [strokes, isImageLoaded]);
+
+      strokes.forEach((stroke) => {
+        if (stroke.points.length < 2) return;
+        ctx.beginPath();
+        ctx.strokeStyle = stroke.color || '#ef4444';
+        ctx.lineWidth = stroke.lineWidth || 8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+        for (let i = 1; i < stroke.points.length; i++) {
+          ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+        }
+        ctx.stroke();
+      });
+    },
+    [strokes, isImageLoaded]
+  );
 
   useEffect(() => {
-    redrawCanvas();
-  }, [redrawCanvas]);
+    drawOnTargetCanvas(canvasRef.current);
+    if (isFullscreenDrawingOpen) {
+      drawOnTargetCanvas(fullCanvasRef.current);
+    }
+  }, [drawOnTargetCanvas, isFullscreenDrawingOpen]);
 
-  // Helper to get touch/mouse position relative to canvas coordinate space
-  const getCanvasCoords = (e: React.TouchEvent | React.MouseEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+  // Helper to get touch/mouse coords
+  const getCanvasCoords = (e: React.TouchEvent | React.MouseEvent, canvasElem: HTMLCanvasElement | null) => {
+    if (!canvasElem) return { x: 0, y: 0 };
+    const rect = canvasElem.getBoundingClientRect();
+    const scaleX = canvasElem.width / rect.width;
+    const scaleY = canvasElem.height / rect.height;
 
     let clientX = 0;
     let clientY = 0;
@@ -140,32 +147,30 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
     };
   };
 
-  // Start Drawing
-  const handleStart = (e: React.TouchEvent | React.MouseEvent) => {
+  const handleStart = (e: React.TouchEvent | React.MouseEvent, isFull = false) => {
     e.preventDefault();
-    const coords = getCanvasCoords(e);
+    const targetCanvas = isFull ? fullCanvasRef.current : canvasRef.current;
+    const coords = getCanvasCoords(e, targetCanvas);
     setIsDrawing(true);
     currentStrokeRef.current = [coords];
   };
 
-  // Move Drawing
-  const handleMove = (e: React.TouchEvent | React.MouseEvent) => {
+  const handleMove = (e: React.TouchEvent | React.MouseEvent, isFull = false) => {
     if (!isDrawing) return;
     e.preventDefault();
-    const coords = getCanvasCoords(e);
+    const targetCanvas = isFull ? fullCanvasRef.current : canvasRef.current;
+    const coords = getCanvasCoords(e, targetCanvas);
     currentStrokeRef.current.push(coords);
 
-    // Live stroke rendering for 60fps responsiveness
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    if (!targetCanvas) return;
+    const ctx = targetCanvas.getContext('2d');
     if (!ctx) return;
 
     const points = currentStrokeRef.current;
     if (points.length >= 2) {
       ctx.beginPath();
-      ctx.strokeStyle = '#ef4444'; // Bright Red marker
-      ctx.lineWidth = 6;
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 8;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.moveTo(points[points.length - 2].x, points[points.length - 2].y);
@@ -174,7 +179,6 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
     }
   };
 
-  // End Drawing & Save
   const handleEnd = () => {
     if (!isDrawing) return;
     setIsDrawing(false);
@@ -183,13 +187,12 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
       const newStroke: DrawingStroke = {
         points: [...currentStrokeRef.current],
         color: '#ef4444',
-        lineWidth: 6,
+        lineWidth: 8,
       };
 
       const updatedStrokes = [...strokes, newStroke];
       setStrokes(updatedStrokes);
 
-      // Save to storage
       const currentDb = getSimpleDbSnapshot();
       const updatedList = currentDb.shoppingItems.map((item) =>
         item.id === activeItem.id ? { ...item, strokes: updatedStrokes, updatedAt: new Date().toISOString() } : item
@@ -199,7 +202,6 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
     currentStrokeRef.current = [];
   };
 
-  // Undo Last Stroke
   const handleUndo = () => {
     if (strokes.length === 0 || !activeItem) return;
     const updatedStrokes = strokes.slice(0, -1);
@@ -212,10 +214,9 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
     saveSimpleDatabase({ ...currentDb, shoppingItems: updatedList });
   };
 
-  // Clear All Strokes
   const handleClearStrokes = () => {
     if (!activeItem || strokes.length === 0) return;
-    if (!confirm('Çizdiğiniz tüm kırmızı çizgiler temizlensin mi?')) return;
+    if (!confirm('Tüm kırmızı çizgiler temizlensin mi?')) return;
     setStrokes([]);
 
     const currentDb = getSimpleDbSnapshot();
@@ -225,7 +226,6 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
     saveSimpleDatabase({ ...currentDb, shoppingItems: updatedList });
   };
 
-  // Delete this shopping list
   const handleDeleteItem = (id: string) => {
     if (!confirm('Bu alışveriş listesini silmek istediğinize emin misiniz?')) return;
     const currentDb = getSimpleDbSnapshot();
@@ -234,7 +234,6 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
     setActiveItemId(updated.length > 0 ? updated[0].id : null);
   };
 
-  // WhatsApp Share or Direct Download
   const handleShareWhatsApp = async () => {
     const canvas = canvasRef.current;
     if (!canvas || !activeItem) return;
@@ -243,10 +242,9 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
       canvas.toBlob(async (blob) => {
         if (!blob) return;
 
-        // Try native Web Share API with file
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], 'liste.png', { type: 'image/png' })] })) {
           try {
-            const file = new File([blob], `${activeItem.title || 'alisveris_listesi'}.png`, { type: 'image/png' });
+            const file = new File([blob], `${activeItem.title || 'alisveris'}.png`, { type: 'image/png' });
             await navigator.share({
               title: activeItem.title,
               text: `🛒 Aşçı Alışveriş Listesi: ${activeItem.title} (${activeItem.weddingTitle || 'Genel'})`,
@@ -254,31 +252,28 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
             });
             return;
           } catch {
-            // User cancelled or share failed, fallback to url/download
+            // fallback
           }
         }
 
-        // Fallback: Direct image download + open WhatsApp with text
         const downloadUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = downloadUrl;
-        a.download = `${activeItem.title || 'alisveris_listesi'}.png`;
+        a.download = `${activeItem.title || 'alisveris'}.png`;
         document.body.appendChild(a);
         a.click();
         a.remove();
         URL.revokeObjectURL(downloadUrl);
 
-        // Open WhatsApp web / mobile app
-        const msg = encodeURIComponent(`Selamün aleyküm, "${activeItem.title}" için alışveriş listesi çizildi ve kontrol edildi.`);
+        const msg = encodeURIComponent(`Selamün aleyküm, "${activeItem.title}" için alışveriş listesi çizildi.`);
         window.open(`https://api.whatsapp.com/send?text=${msg}`, '_blank');
       }, 'image/png');
     } catch (e) {
       console.error('Share error:', e);
-      alert('Paylaşım penceresi açılamadı. Resim cihazınıza indirildi.');
+      alert('Resim cihaza indirildi.');
     }
   };
 
-  // New photo upload
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -291,10 +286,9 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // Save New Shopping List
   const handleCreateNewList = () => {
     if (!uploadedPhotoUrl) {
-      alert('Lütfen kağıt listenin fotoğrafını çekin veya galeriden seçin.');
+      alert('Lütfen fotoğraf çekin.');
       return;
     }
 
@@ -324,17 +318,17 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Top Banner & Action */}
+      {/* Top Banner */}
       <div className="rounded-3xl bg-amber-500 p-4 sm:p-5 text-white shadow-md flex items-center justify-between">
         <div>
           <span className="text-xs font-black uppercase tracking-wider text-amber-100">
-            Parmakla Çizilebilir Kağıt Liste
+            Fotoğraflı & Çizilebilir Liste
           </span>
           <h2 className="text-xl sm:text-2xl font-black mt-0.5">
-            🛒 Kağıt Listenin Fotoğrafı
+            🛒 Kağıt Liste Çizimi
           </h2>
           <p className="text-xs font-bold text-amber-100 mt-1">
-            Aldığın malzemenin üstünü parmağınla kırmızıyla çiz!
+            Fotoğrafa basınca tam ekranda rahatça çizebilirsiniz!
           </p>
         </div>
         <button
@@ -347,7 +341,7 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
         </button>
       </div>
 
-      {/* List Selector Pills (if multiple lists exist) */}
+      {/* List Selector Pills */}
       {shoppingItems.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar">
           {shoppingItems.map((item) => (
@@ -370,10 +364,9 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
         </div>
       )}
 
-      {/* Main Canvas Workspace */}
+      {/* Main Canvas Workspace with Tap-to-Fullscreen instruction */}
       {activeItem ? (
         <div className="rounded-3xl border-2 border-slate-200 bg-white p-3 sm:p-4 shadow-sm space-y-3">
-          {/* Header Info of Active List */}
           <div className="flex items-center justify-between gap-2 px-1">
             <div>
               <h3 className="text-lg font-black text-slate-900 leading-tight">
@@ -387,61 +380,45 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
               )}
             </div>
 
-            {/* Quick action buttons: Undo, Clear, Delete */}
             <div className="flex items-center gap-1.5">
               <button
-                onClick={handleUndo}
-                disabled={strokes.length === 0}
+                onClick={() => setIsFullscreenDrawingOpen(true)}
                 type="button"
-                className="flex items-center justify-center h-11 w-11 rounded-2xl bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-40 transition-all active:scale-95"
-                title="Son Çizgiyi Geri Al"
+                className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-black text-white hover:bg-amber-600 shadow-sm active:scale-95 min-h-[44px]"
               >
-                <Undo2 className="w-5 h-5" />
-              </button>
-
-              <button
-                onClick={handleClearStrokes}
-                disabled={strokes.length === 0}
-                type="button"
-                className="flex items-center justify-center h-11 w-11 rounded-2xl bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-40 transition-all active:scale-95"
-                title="Tüm Çizgileri Temizle"
-              >
-                <Trash2 className="w-5 h-5" />
+                <Maximize2 className="w-4 h-4" />
+                <span>Tam Ekran Çiz</span>
               </button>
 
               <button
                 onClick={() => handleDeleteItem(activeItem.id)}
                 type="button"
-                className="flex items-center justify-center h-11 w-11 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-all active:scale-95"
+                className="flex items-center justify-center h-11 w-11 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-all"
                 title="Listeyi Sil"
               >
-                <Trash2 className="w-5 h-5 text-red-600" />
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Interactive Finger Drawing Scratchpad */}
-          <div className="relative w-full rounded-2xl overflow-hidden border-2 border-slate-300 bg-slate-100 shadow-inner flex items-center justify-center select-none touch-none">
+          {/* Canvas Wrapper - Tapping opens Fullscreen Drawing */}
+          <div
+            onClick={() => setIsFullscreenDrawingOpen(true)}
+            className="relative w-full rounded-2xl overflow-hidden border-2 border-amber-400 bg-slate-100 shadow-inner flex items-center justify-center cursor-pointer group"
+          >
             <canvas
               ref={canvasRef}
               width={720}
               height={960}
-              onMouseDown={handleStart}
-              onMouseMove={handleMove}
-              onMouseUp={handleEnd}
-              onMouseLeave={handleEnd}
-              onTouchStart={handleStart}
-              onTouchMove={handleMove}
-              onTouchEnd={handleEnd}
-              onTouchCancel={handleEnd}
-              className="w-full h-auto max-h-[65vh] object-contain cursor-crosshair touch-none block"
-              style={{ touchAction: 'none' }}
+              className="w-full h-auto max-h-[55vh] object-contain block pointer-events-none"
             />
 
-            {/* Scratchpad Helper Overlay */}
-            <div className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-xs text-white text-[11px] font-bold px-3 py-1 rounded-full pointer-events-none flex items-center gap-1.5 shadow-sm">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-              <span>Parmağınızla üzerine çizgi çekin</span>
+            {/* Tap to open fullscreen overlay */}
+            <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-all flex items-center justify-center">
+              <div className="rounded-2xl bg-slate-900/90 backdrop-blur-sm text-white px-4 py-2.5 text-xs font-black flex items-center gap-2 shadow-lg">
+                <Maximize2 className="w-4 h-4 text-amber-400" />
+                <span>Büyük Ekranda Çizmek İçin Dokun</span>
+              </div>
             </div>
           </div>
 
@@ -462,12 +439,11 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
               className="w-full flex items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3.5 px-4 text-base font-black text-white shadow-md hover:bg-slate-800 active:scale-98 transition-all min-h-[54px]"
             >
               <Download className="w-5 h-5" />
-              <span>Çizilmiş Resmi Telefona Kaydet</span>
+              <span>Resmi İndir</span>
             </button>
           </div>
         </div>
       ) : (
-        /* Empty State */
         <div className="rounded-3xl border-2 border-dashed border-slate-300 bg-white p-8 text-center space-y-4">
           <div className="flex h-20 w-20 mx-auto items-center justify-center rounded-3xl bg-amber-50 text-amber-600">
             <Camera className="w-10 h-10" />
@@ -477,7 +453,7 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
               Henüz Kağıt Liste Yüklenmedi
             </h3>
             <p className="text-sm font-semibold text-slate-500 max-w-sm mx-auto">
-              Ev sahibinin verdiği ya da mutfakta yazdığınız kağıt listenin fotoğrafını çekin. Markette parmağınızla aldıklarınızı çizin.
+              Kağıt listenin fotoğrafını çekin, üzerine dokunarak tam ekranda rahatça işaretleyin.
             </p>
           </div>
 
@@ -489,6 +465,85 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
             <Camera className="w-6 h-6" />
             <span>İlk Listenin Fotoğrafını Çek</span>
           </button>
+        </div>
+      )}
+
+      {/* ================= FULLSCREEN DRAWING MODAL ================= */}
+      {isFullscreenDrawingOpen && activeItem && (
+        <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col select-none touch-none animate-in fade-in">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800 shrink-0">
+            <div>
+              <h3 className="text-base font-black text-white truncate max-w-[200px] sm:max-w-md">
+                {activeItem.title}
+              </h3>
+              <span className="text-[11px] font-bold text-amber-400">
+                Tam Ekran Çizim Modu (Parmakla Üzerini Çizin)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleUndo}
+                disabled={strokes.length === 0}
+                type="button"
+                className="flex items-center gap-1 rounded-xl bg-slate-800 px-3 py-2 text-xs font-black text-white hover:bg-slate-700 disabled:opacity-40 min-h-[40px]"
+              >
+                <Undo2 className="w-4 h-4" />
+                <span>Geri Al</span>
+              </button>
+
+              <button
+                onClick={handleClearStrokes}
+                disabled={strokes.length === 0}
+                type="button"
+                className="flex items-center gap-1 rounded-xl bg-rose-950 px-3 py-2 text-xs font-black text-rose-300 hover:bg-rose-900 disabled:opacity-40 min-h-[40px]"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Temizle</span>
+              </button>
+
+              <button
+                onClick={() => setIsFullscreenDrawingOpen(false)}
+                type="button"
+                className="flex items-center justify-center h-10 w-10 rounded-xl bg-emerald-600 text-white font-black hover:bg-emerald-500"
+                title="Kapat ve Kaydet"
+              >
+                <Check className="w-5 h-5 stroke-[3]" />
+              </button>
+            </div>
+          </div>
+
+          {/* Fullscreen Canvas Container */}
+          <div className="flex-1 relative flex items-center justify-center p-2 bg-slate-900 overflow-hidden">
+            <canvas
+              ref={fullCanvasRef}
+              width={720}
+              height={960}
+              onMouseDown={(e) => handleStart(e, true)}
+              onMouseMove={(e) => handleMove(e, true)}
+              onMouseUp={handleEnd}
+              onMouseLeave={handleEnd}
+              onTouchStart={(e) => handleStart(e, true)}
+              onTouchMove={(e) => handleMove(e, true)}
+              onTouchEnd={handleEnd}
+              onTouchCancel={handleEnd}
+              className="w-full h-full max-h-[85vh] object-contain cursor-crosshair touch-none"
+              style={{ touchAction: 'none' }}
+            />
+          </div>
+
+          {/* Footer Close Button */}
+          <div className="p-3 bg-slate-900 border-t border-slate-800 flex items-center justify-center shrink-0">
+            <button
+              onClick={() => setIsFullscreenDrawingOpen(false)}
+              type="button"
+              className="w-full max-w-md flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3.5 px-6 text-base font-black text-white shadow-lg hover:bg-emerald-500 min-h-[50px]"
+            >
+              <Check className="w-5 h-5 stroke-[3]" />
+              <span>Çizimi Tamamla & Kaydet</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -512,7 +567,6 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
               </button>
             </div>
 
-            {/* List Name */}
             <div>
               <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1">
                 Liste Adı (Örn: Hacı Salih Düğünü Pazar Listesi)
@@ -526,7 +580,6 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
               />
             </div>
 
-            {/* Optional Wedding Link */}
             {weddings.length > 0 && (
               <div>
                 <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1">
@@ -547,7 +600,6 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
               </div>
             )}
 
-            {/* Camera / File Input */}
             <div>
               <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
                 Kağıdın Fotoğrafını Çekin veya Seçin *
@@ -590,7 +642,6 @@ export const SimpleShoppingView: React.FC<SimpleShoppingViewProps> = ({
               )}
             </div>
 
-            {/* Buttons */}
             <div className="flex items-center gap-3 pt-2">
               <button
                 type="button"

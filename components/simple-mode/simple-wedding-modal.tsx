@@ -44,11 +44,11 @@ export const SimpleWeddingModal: React.FC<SimpleWeddingModalProps> = ({
   const [date, setDate] = useState(
     editingWedding?.date || initialDate || getPresetDate('this_sat')
   );
-  const [guestCount, setGuestCount] = useState<number>(editingWedding?.guestCount || 500);
+  const [guestCount, setGuestCount] = useState<number | string>(editingWedding?.guestCount ?? 500);
   const [phone, setPhone] = useState(editingWedding?.phone || '');
   const [notes, setNotes] = useState(editingWedding?.notes || '');
-  const [agreedAmount, setAgreedAmount] = useState<number>(editingWedding?.agreedAmount || 0);
-  const [receivedDeposit, setReceivedDeposit] = useState<number>(editingWedding?.receivedDeposit || 0);
+  const [agreedAmount, setAgreedAmount] = useState<number | string>(editingWedding?.agreedAmount ?? '');
+  const [receivedDeposit, setReceivedDeposit] = useState<number | string>(editingWedding?.receivedDeposit ?? '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,9 +167,9 @@ export const SimpleWeddingModal: React.FC<SimpleWeddingModalProps> = ({
               <input
                 type="number"
                 min="10"
-                step="25"
-                value={guestCount || ''}
-                onChange={(e) => setGuestCount(Number(e.target.value))}
+                step="1"
+                value={guestCount}
+                onChange={(e) => setGuestCount(e.target.value)}
                 className="w-full rounded-2xl border-2 border-slate-300 p-3.5 text-base font-black text-slate-900 focus:border-emerald-500 focus:outline-none"
                 placeholder="500"
               />
@@ -182,7 +182,7 @@ export const SimpleWeddingModal: React.FC<SimpleWeddingModalProps> = ({
                   type="button"
                   onClick={() => setGuestCount(preset)}
                   className={`py-2 px-3 rounded-xl text-xs font-black shrink-0 transition-all ${
-                    guestCount === preset
+                    Number(guestCount) === preset
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
@@ -201,10 +201,10 @@ export const SimpleWeddingModal: React.FC<SimpleWeddingModalProps> = ({
               </label>
               <input
                 type="number"
-                step="500"
+                step="100"
                 placeholder="Örn: 35000"
-                value={agreedAmount || ''}
-                onChange={(e) => setAgreedAmount(Number(e.target.value))}
+                value={agreedAmount}
+                onChange={(e) => setAgreedAmount(e.target.value)}
                 className="w-full rounded-2xl border-2 border-slate-300 p-3.5 text-base font-black text-slate-900 focus:border-emerald-500 focus:outline-none"
               />
             </div>
@@ -215,10 +215,10 @@ export const SimpleWeddingModal: React.FC<SimpleWeddingModalProps> = ({
               </label>
               <input
                 type="number"
-                step="500"
+                step="100"
                 placeholder="Örn: 10000"
-                value={receivedDeposit || ''}
-                onChange={(e) => setReceivedDeposit(Number(e.target.value))}
+                value={receivedDeposit}
+                onChange={(e) => setReceivedDeposit(e.target.value)}
                 className="w-full rounded-2xl border-2 border-slate-300 p-3.5 text-base font-black text-slate-900 focus:border-emerald-500 focus:outline-none"
               />
             </div>
