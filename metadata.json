@@ -1,0 +1,6 @@
+{
+  "name": "Aşçı Defteri - Tek Dokunuş, Sıfır Karmaşa",
+  "description": "Seyyar düğün ve hayır aşçıları için internetsiz, şifresiz, dev butonlu pratik iş defteri.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

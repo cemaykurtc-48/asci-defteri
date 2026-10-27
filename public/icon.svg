@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+    <linearGradient id="chefGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F1F5F9"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background with rounded squircle -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)"/>
+  
+  <!-- Spiral binding holes on left -->
+  <circle cx="70" cy="150" r="14" fill="#334155"/>
+  <circle cx="70" cy="220" r="14" fill="#334155"/>
+  <circle cx="70" cy="290" r="14" fill="#334155"/>
+  <circle cx="70" cy="360" r="14" fill="#334155"/>
+
+  <!-- Paper Defter Base -->
+  <rect x="104" y="90" width="330" height="332" rx="28" fill="#FFFFFF"/>
+
+  <!-- Big Kazan / Chef Pot Body -->
+  <path d="M170 230 C170 340 370 340 370 230 Z" fill="#0F172A"/>
+  
+  <!-- Pot Rim -->
+  <rect x="156" y="218" width="228" height="20" rx="10" fill="#1E293B"/>
+  
+  <!-- Pot Handles -->
+  <path d="M156 240 C130 240 130 270 156 270" stroke="#0F172A" stroke-width="12" fill="none" stroke-linecap="round"/>
+  <path d="M384 240 C410 240 410 270 384 270" stroke="#0F172A" stroke-width="12" fill="none" stroke-linecap="round"/>
+
+  <!-- Chef Hat on Top of Pot -->
+  <path d="M210 216 L210 170 C190 170 180 140 210 120 C230 100 260 100 270 120 C280 100 310 100 330 120 C360 140 350 170 330 170 L330 216 Z" fill="url(#chefGrad)" stroke="#CBD5E1" stroke-width="6"/>
+
+  <!-- Checkmark Badge in Gold -->
+  <circle cx="370" cy="360" r="48" fill="url(#goldGrad)" filter="drop-shadow(0 8px 16px rgba(217,119,6,0.4))"/>
+  <path d="M352 360 L366 374 L392 346" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

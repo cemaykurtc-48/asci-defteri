@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidWedding(data) {
+      return data.title is string && data.title.size() <= 100 &&
+             data.date is string && data.date.size() <= 20 &&
+             (!('time' in data) || (data.time is string && data.time.size() <= 10)) &&
+             (!('location' in data) || (data.location is string && data.location.size() <= 150)) &&
+             (!('note' in data) || (data.note is string && data.note.size() <= 300)) &&
+             (!('completed' in data) || data.completed is bool);
+    }
+
+    function isValidShoppingItem(data) {
+      return data.text is string && data.text.size() <= 200 &&
+             data.completed is bool &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 50)) &&
+             (!('imageNoteUrl' in data) || (data.imageNoteUrl is string && data.imageNoteUrl.size() <= 500000));
+    }
+
+    function isValidBalanceEntry(data) {
+      return (data.type == 'customer' || data.type == 'expense') &&
+             data.name is string && data.name.size() <= 100 &&
+             data.totalAmount is number &&
+             data.remainingAmount is number &&
+             (!('paidAmount' in data) || data.paidAmount is number) &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 250)) &&
+             (!('status' in data) || (data.status in ['open', 'settled']));
+    }
+
+    match /devices/{deviceId} {
+      allow read, write: if isValidId(deviceId);
+
+      match /weddings/{weddingId} {
+        allow get, list, delete: if isValidId(deviceId) && isValidId(weddingId);
+        allow create, update: if isValidId(deviceId) && isValidId(weddingId) && isValidWedding(request.resource.data);
+      }
+
+      match /shopping/{itemId} {
+        allow get, list, delete: if isValidId(deviceId) && isValidId(itemId);
+        allow create, update: if isValidId(deviceId) && isValidId(itemId) && isValidShoppingItem(request.resource.data);
+      }
+
+      match /balances/{balanceId} {
+        allow get, list, delete: if isValidId(deviceId) && isValidId(balanceId);
+        allow create, update: if isValidId(deviceId) && isValidId(balanceId) && isValidBalanceEntry(request.resource.data);
+      }
+    }
+  }
+}

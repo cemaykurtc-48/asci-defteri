@@ -1,0 +1,62 @@
+{
+  "entities": {
+    "Wedding": {
+      "title": "Wedding",
+      "description": "Düğün ve etkinlik kaydı",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 100 },
+        "date": { "type": "string", "maxLength": 20 },
+        "time": { "type": "string", "maxLength": 10 },
+        "location": { "type": "string", "maxLength": 150 },
+        "note": { "type": "string", "maxLength": 300 },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["title", "date"]
+    },
+    "ShoppingItem": {
+      "title": "ShoppingItem",
+      "description": "Alışveriş listesi maddesi",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "maxLength": 200 },
+        "completed": { "type": "boolean" },
+        "category": { "type": "string", "maxLength": 50 },
+        "imageNoteUrl": { "type": "string", "maxLength": 500000 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["text", "completed"]
+    },
+    "BalanceEntry": {
+      "title": "BalanceEntry",
+      "description": "Müşteri ve Ekip masrafı bakiye defter kaydı",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["customer", "expense"] },
+        "name": { "type": "string", "maxLength": 100 },
+        "totalAmount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "remainingAmount": { "type": "number" },
+        "description": { "type": "string", "maxLength": 250 },
+        "status": { "type": "string", "enum": ["open", "settled"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["type", "name", "totalAmount", "remainingAmount"]
+    }
+  },
+  "firestore": {
+    "/devices/{deviceId}/weddings/{weddingId}": {
+      "schema": "Wedding",
+      "description": "Cihaza özel düğün listesi koleksiyonu"
+    },
+    "/devices/{deviceId}/shopping/{itemId}": {
+      "schema": "ShoppingItem",
+      "description": "Cihaza özel alışveriş listesi maddeleri"
+    },
+    "/devices/{deviceId}/balances/{balanceId}": {
+      "schema": "BalanceEntry",
+      "description": "Cihaza özel borç-alacak ve bakiye kayıtları"
+    }
+  }
+}
