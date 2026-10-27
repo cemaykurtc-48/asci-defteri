@@ -29,6 +29,14 @@ import {
   formatTL,
   getTotalReceivables,
 } from '@/lib/cook-storage';
+import {
+  subscribeAppMode,
+  getAppModeSnapshot,
+  getAppModeServerSnapshot,
+  setAppMode,
+} from '@/lib/app-mode';
+import { ModeSelectorScreen } from '@/components/mode-selector-screen';
+import { SimpleHome } from '@/components/simple-mode/simple-home';
 
 export default function HomePage() {
   // Hydration-safe external store subscriptions (Zero SSR-client mismatch, zero effect setState)
@@ -36,6 +44,12 @@ export default function HomePage() {
     subscribeStorage,
     () => true,
     () => false
+  );
+
+  const appMode = useSyncExternalStore(
+    subscribeAppMode,
+    getAppModeSnapshot,
+    getAppModeServerSnapshot
   );
 
   const jobs = useSyncExternalStore(
@@ -213,7 +227,7 @@ export default function HomePage() {
     setIsWizardOpen(true);
   };
 
-  // Loading state identical on server and client before hydration
+  // 1. Loading state identical on server and client before hydration
   if (!isHydrated) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
@@ -237,10 +251,21 @@ export default function HomePage() {
     );
   }
 
+  // 2. First-time visitor without chosen mode -> Show Mode Selector
+  if (!appMode) {
+    return <ModeSelectorScreen onSelectMode={(mode) => setAppMode(mode)} />;
+  }
+
+  // 3. Simple Mode -> Ultra-simple 3-module senior cook notebook
+  if (appMode === 'simple') {
+    return <SimpleHome onSwitchToAdvanced={() => setAppMode('advanced')} />;
+  }
+
+  // 4. Advanced Mode -> Full-featured Recipe, Ingredient, Ledger and Calendar notebook
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
-      {/* Top Bar */}
-      <TopBar />
+      {/* Top Bar with Kolay Mod switcher */}
+      <TopBar onSwitchToSimple={() => setAppMode('simple')} />
 
       {/* Main Content Area */}
       <main className="mx-auto w-full max-w-2xl flex-1 px-3 sm:px-4 py-4 sm:py-5 space-y-5 pb-36">

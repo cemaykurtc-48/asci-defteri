@@ -1,6 +1,6 @@
 {
-  "summary":  "50 yaşındaki seyyar aşçı ergonomisine uygun detaylı proje analizi ve geliştirme planı: 3 sekmeli alt bar (İş Defteri, Pazar/Alışveriş ve Genel Cari Defter), iş seçerek doğrudan alışveriş yönetimi ve iş harici giderleri de (mazot, tüp, kazan masrafı) kapsayan genel kasa takip mimarisi.",
-  "updatedAt":  "2026-10-26T23:26:58.746963862Z",
+  "summary":  "Aşçı Defteri için Giriş Modu Seçimi (Basit Mod ve Gelişmiş Mod), tamamen bağımsız çalışan Basit Aşçı Defteri (Düğün Listesi/Takvim, Fotoğraflı ve Parmakla Çizilebilir Alışveriş Listesi, Pratik Müşteri & Ekip Bakiye Takibi), ve tek dokunuşla modlar arası geçiş planı.",
+  "updatedAt":  "2026-10-27T01:01:56.933799900Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
