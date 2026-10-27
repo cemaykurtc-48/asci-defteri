@@ -1,5 +1,12 @@
 'use client';
 
+export interface PaymentRecord {
+  id: string;
+  amount: number;
+  date: string;
+  note: string;
+}
+
 export interface SimpleWedding {
   id: string;
   title: string;           // Düğün / Ev Sahibi Adı (örn: Hacı Salih Düğünü)
@@ -9,6 +16,7 @@ export interface SimpleWedding {
   notes?: string;          // Menü veya özel not (örn: Çorba, Etli Pilav, Helva)
   agreedAmount: number;    // Anlaşılan ücret
   receivedDeposit: number; // Alınan peşinat
+  paymentHistory?: PaymentRecord[]; // Geriye dönük tahsilat geçmişi
   isCompleted: boolean;    // Düğün bitti mi
   createdAt: string;
 }
@@ -171,7 +179,7 @@ export function formatDateTurkish(dateStr: string): string {
       const days = [
         'Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'
       ];
-      return `${day} ${months[month]} ${days[d.getDay()]}`;
+      return `${day} ${months[month]} ${days[d.getDay()]} ${year}`;
     }
     return dateStr;
   } catch {

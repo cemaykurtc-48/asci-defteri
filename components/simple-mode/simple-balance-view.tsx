@@ -5,11 +5,14 @@ import {
   Wallet,
   Users,
   Plus,
-  CheckCircle,
   ArrowDownRight,
   ArrowUpRight,
   DollarSign,
   Trash2,
+  Calendar,
+  Check,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   SimpleWedding,
@@ -31,9 +34,13 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'receivables' | 'workers'>('receivables');
 
+  // Expanded wedding to view payment history
+  const [expandedWeddingId, setExpandedWeddingId] = useState<string | null>(null);
+
   // Modal for receiving payment from a wedding
   const [payingWedding, setPayingWedding] = useState<SimpleWedding | null>(null);
   const [incomingAmount, setIncomingAmount] = useState<number | ''>('');
+  const [paymentNote, setPaymentNote] = useState('');
 
   // Modal for adding/editing a worker
   const [isWorkerModalOpen, setIsWorkerModalOpen] = useState(false);
@@ -44,7 +51,8 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
 
   // Totals
   const totalReceivables = weddings.reduce((sum, w) => {
-    const remaining = Math.max(0, (w.agreedAmount || 0) - (w.receivedDeposit || 0));
+    const totalPaid = (w.receivedDeposit || 0) + (w.paymentHistory || []).reduce((s, p) => s + p.amount, 0);
+    const remaining = Math.max(0, (w.agreedAmount || 0) - totalPaid);
     return sum + remaining;
   }, 0);
 
@@ -53,23 +61,50 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
     return sum + remaining;
   }, 0);
 
-  // Handle wedding deposit addition
+  // Handle wedding payment addition
   const handleSaveIncomingPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!payingWedding || !incomingAmount || Number(incomingAmount) <= 0) return;
 
+    const newPayment = {
+      id: 'pay_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      amount: Number(incomingAmount),
+      date: new Date().toISOString().split('T')[0],
+      note: paymentNote.trim() || 'Tahsilat',
+    };
+
     const currentDb = getSimpleDbSnapshot();
-    const updated = currentDb.weddings.map((w) =>
-      w.id === payingWedding.id
-        ? {
-            ...w,
-            receivedDeposit: (w.receivedDeposit || 0) + Number(incomingAmount),
-          }
-        : w
-    );
+    const updated = currentDb.weddings.map((w) => {
+      if (w.id === payingWedding.id) {
+        return {
+          ...w,
+          paymentHistory: [...(w.paymentHistory || []), newPayment],
+        };
+      }
+      return w;
+    });
+
     saveSimpleDatabase({ ...currentDb, weddings: updated });
     setPayingWedding(null);
     setIncomingAmount('');
+    setPaymentNote('');
+  };
+
+  // Delete specific payment history entry
+  const handleDeletePaymentHistory = (weddingId: string, paymentId: string) => {
+    if (!confirm('Bu tahsilat kaydı silinsin mi?')) return;
+    const currentDb = getSimpleDbSnapshot();
+    const updated = currentDb.weddings.map((w) => {
+      if (w.id === weddingId) {
+        const history = w.paymentHistory || [];
+        return {
+          ...w,
+          paymentHistory: history.filter((p) => p.id !== paymentId),
+        };
+      }
+      return w;
+    });
+    saveSimpleDatabase({ ...currentDb, weddings: updated });
   };
 
   // Handle adding new worker wage
@@ -130,7 +165,6 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
     <div className="space-y-4">
       {/* 2 Big Summary Metric Cards */}
       <div className="grid grid-cols-2 gap-2.5">
-        {/* Receivables summary */}
         <div className="rounded-3xl border-2 border-emerald-500 bg-emerald-500 p-4 text-white shadow-md">
           <span className="text-[11px] font-black uppercase tracking-wider text-emerald-100 flex items-center gap-1">
             <ArrowDownRight className="w-3.5 h-3.5" />
@@ -144,7 +178,6 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
           </span>
         </div>
 
-        {/* Worker debt summary */}
         <div className="rounded-3xl border-2 border-amber-600 bg-amber-600 p-4 text-white shadow-md">
           <span className="text-[11px] font-black uppercase tracking-wider text-amber-100 flex items-center gap-1">
             <ArrowUpRight className="w-3.5 h-3.5" />
@@ -191,29 +224,47 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
       {/* ================= SECTION 1: MÜŞTERİ ALACAKLARI ================= */}
       {activeSubTab === 'receivables' && (
         <div className="space-y-3">
+          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl text-xs font-bold text-emerald-900 text-center">
+            💡 Düğün kartına tıklayarak geçmiş ödeme tarihlerini görebilir, yanlış ödemeleri silebilirsiniz.
+          </div>
+
           {weddings.length === 0 ? (
             <div className="rounded-3xl border-2 border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">
               Henüz defterde kayıtlı düğün bulunmuyor.
             </div>
           ) : (
             weddings.map((w) => {
-              const remaining = Math.max(0, (w.agreedAmount || 0) - (w.receivedDeposit || 0));
+              const historyTotal = (w.paymentHistory || []).reduce((s, p) => s + p.amount, 0);
+              const totalPaid = (w.receivedDeposit || 0) + historyTotal;
+              const remaining = Math.max(0, (w.agreedAmount || 0) - totalPaid);
               const isPaidInFull = remaining === 0;
+              const isExpanded = expandedWeddingId === w.id;
 
               return (
                 <div
                   key={w.id}
-                  className={`rounded-3xl border-2 bg-white p-4 shadow-sm space-y-3 ${
-                    isPaidInFull ? 'border-slate-200 opacity-75' : 'border-emerald-300'
+                  className={`rounded-3xl border-2 bg-white p-4 shadow-sm space-y-3 transition-all ${
+                    isPaidInFull ? 'border-slate-200' : 'border-emerald-300'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  {/* Clickable Header to Expand/Collapse History */}
+                  <div
+                    onClick={() => setExpandedWeddingId(isExpanded ? null : w.id)}
+                    className="flex items-center justify-between cursor-pointer"
+                  >
                     <div>
-                      <h4 className="text-lg font-black text-slate-900">
-                        {w.title}
-                      </h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-lg font-black text-slate-900">
+                          {w.title}
+                        </h4>
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-slate-500" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-slate-500" />
+                        )}
+                      </div>
                       <span className="text-xs font-bold text-slate-500">
-                        {formatDateTurkish(w.date)}
+                        {formatDateTurkish(w.date)} · Üzerine basıp geçmişi gör
                       </span>
                     </div>
 
@@ -235,14 +286,62 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
                       <div className="text-sm font-black font-mono text-slate-800">{formatTL(w.agreedAmount)}</div>
                     </div>
                     <div>
-                      <span className="text-[10px] font-black uppercase text-slate-400">Alınan</span>
-                      <div className="text-sm font-black font-mono text-blue-600">{formatTL(w.receivedDeposit)}</div>
+                      <span className="text-[10px] font-black uppercase text-slate-400">Alınan Toplam</span>
+                      <div className="text-sm font-black font-mono text-blue-600">{formatTL(totalPaid)}</div>
                     </div>
                     <div>
                       <span className="text-[10px] font-black uppercase text-slate-400">Kalan</span>
                       <div className="text-sm font-black font-mono text-emerald-600">{formatTL(remaining)}</div>
                     </div>
                   </div>
+
+                  {/* Expanded Payment History List */}
+                  {isExpanded && (
+                    <div className="bg-slate-50 rounded-2xl p-3 space-y-2 border border-slate-200 animate-in fade-in">
+                      <span className="text-xs font-black text-slate-700 uppercase tracking-wider block">
+                        Geriye Dönük Tahsilat Geçmişi:
+                      </span>
+
+                      {w.receivedDeposit > 0 && (
+                        <div className="flex items-center justify-between text-xs font-bold bg-white p-2.5 rounded-xl border border-slate-200">
+                          <div>
+                            <span className="text-slate-900">İlk Kayıt / Peşinat</span>
+                            <span className="text-slate-400 ml-2">({formatDateTurkish(w.date)})</span>
+                          </div>
+                          <span className="font-mono text-blue-600 font-black">{formatTL(w.receivedDeposit)}</span>
+                        </div>
+                      )}
+
+                      {(!w.paymentHistory || w.paymentHistory.length === 0) && w.receivedDeposit === 0 && (
+                        <p className="text-xs font-semibold text-slate-400 italic">
+                          Henüz tahsilat girilmemiş.
+                        </p>
+                      )}
+
+                      {(w.paymentHistory || []).map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between text-xs font-bold bg-white p-2.5 rounded-xl border border-slate-200"
+                        >
+                          <div>
+                            <span className="text-slate-900">{p.note}</span>
+                            <span className="text-slate-400 ml-2">({formatDateTurkish(p.date)})</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-emerald-600 font-black">{formatTL(p.amount)}</span>
+                            <button
+                              onClick={() => handleDeletePaymentHistory(w.id, p.id)}
+                              type="button"
+                              className="text-red-500 hover:text-red-700 p-1 bg-red-50 rounded-lg"
+                              title="Bu Tahsilatı Sil"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Add Payment Button */}
                   {!isPaidInFull && (
@@ -268,7 +367,6 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
       {/* ================= SECTION 2: EKİP YEVMİYELERİ ================= */}
       {activeSubTab === 'workers' && (
         <div className="space-y-3">
-          {/* Top Add Worker Button */}
           <button
             onClick={() => setIsWorkerModalOpen(true)}
             type="button"
@@ -321,13 +419,13 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
                         onClick={() => handleDeleteWorker(p.id)}
                         type="button"
                         className="text-slate-400 hover:text-red-600 p-1"
+                        title="Sil"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Numbers */}
                   <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-100 text-center">
                     <div>
                       <span className="text-[10px] font-black uppercase text-slate-400">Yevmiye</span>
@@ -343,7 +441,6 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Pay button */}
                   {!isPaid && (
                     <button
                       onClick={() => handlePayWorker(p.id)}
@@ -366,13 +463,13 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-sm shadow-2xl space-y-4 border border-slate-200">
             <h3 className="text-lg font-black text-slate-900">
-              Para Girişi (Tahsilat)
+              Para Girişi (Tahsilat Ekle)
             </h3>
             <p className="text-sm font-bold text-slate-600">
-              {payingWedding.title} için alınan para miktarını yazın:
+              {payingWedding.title} için alınan tutar:
             </p>
 
-            <form onSubmit={handleSaveIncomingPayment} className="space-y-4">
+            <form onSubmit={handleSaveIncomingPayment} className="space-y-3">
               <input
                 type="number"
                 required
@@ -384,7 +481,15 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
                 className="w-full rounded-2xl border-2 border-slate-300 p-4 text-xl font-black text-slate-900 focus:border-emerald-500 focus:outline-none"
               />
 
-              <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Açıklama (Örn: 2. Taksit / Kaparo)"
+                value={paymentNote}
+                onChange={(e) => setPaymentNote(e.target.value)}
+                className="w-full rounded-2xl border-2 border-slate-300 p-3 text-sm font-bold text-slate-900 focus:border-emerald-500 focus:outline-none"
+              />
+
+              <div className="flex items-center gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setPayingWedding(null)}
@@ -396,7 +501,7 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
                   type="submit"
                   className="w-2/3 rounded-2xl bg-emerald-600 py-3 text-base font-black text-white shadow-md hover:bg-emerald-700"
                 >
-                  Kaydet
+                  Tahsilatı Kaydet
                 </button>
               </div>
             </form>
@@ -428,7 +533,7 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="Örn: Mehmet Çırak veya Fatma Abla"
+                  placeholder="Örn: Mehmet Çırak"
                   value={workerName}
                   onChange={(e) => setWorkerName(e.target.value)}
                   className="w-full rounded-2xl border-2 border-slate-300 p-3.5 text-base font-black text-slate-900 focus:border-amber-500 focus:outline-none"
@@ -438,7 +543,7 @@ export const SimpleBalanceView: React.FC<SimpleBalanceViewProps> = ({
               {weddings.length > 0 && (
                 <div>
                   <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1">
-                    Hangi Düğün İçin Çalıştı? (İsteğe Bağlı)
+                    Hangi Düğün İçin? (İsteğe Bağlı)
                   </label>
                   <select
                     value={selectedWeddingForWorker}
